@@ -1,108 +1,122 @@
-    #include <Arduino.h>
-  //input signals
-    #define trigger 2  //which arduino pin connection to trigger on stage wall
-    #define remote 3  //which arduinon pin connection to hand held remote control
-  //outputs to activate relalys
-    #define relayLight 4  //arduino pin connection to relay 1
-    #define relayChew 5  //arduino pin connection to relay 2
-    #define relayOpen 6  //arduino pin connection to relay 3
-    #define relayClose 7  //arduino pin connection to relay 4
-  //variables
-    int chairState = 4;
-    int trigger_value = 0;  //calling switch open or closed
-    unsigned long timer_start = 0;  //start counting
-    unsigned long timer_counting = 0;  //counting
-    unsigned long door_open_delay = 2000;  //wait threshold in milliseconds
 
+#include <Arduino.h>
+
+//input signals
+#define trigger 2  //which Arduino pin connection to trigger on stage wall
+#define remote 3   //which Arduino pin connection to hand-held remote control
+
+//outputs to activate relays
+#define relayLight 4   //Arduino pin connection to relay 1
+#define relayChew 5    //Arduino pin connection to relay 2
+#define relayOpen 6    //Arduino pin connection to relay 3
+#define relayClose 7   //Arduino pin connection to relay 4
+
+//variables
+int chairState = 0;
+int trigger_value = 0;     //switch state (open or closed)
+unsigned long timer_start = 0;  //start counting
+unsigned long timer_counting = 0;  //counting
+unsigned long door_open_delay = 2400;  //wait threshold in milliseconds
 
 void setup() {
-  // put your setup code here, to run once:
+  Serial.begin(9600); // Initialize serial communication
+  
   //input
-    pinMode(trigger,INPUT);  //trigger stage wall
-    pinMode(remote,INPUT);  //remote control button
+  pinMode(trigger, INPUT);  //trigger stage wall
+  //pinMode(remote, INPUT_PULLUP);   //remote control button
+  
   //outputs
-    pinMode(relayLight,OUTPUT);
-    pinMode(relayChew,OUTPUT);
-    pinMode(relayOpen,OUTPUT);
-    pinMode(relayClose,OUTPUT);
+  pinMode(relayLight, OUTPUT);
+  pinMode(relayChew, OUTPUT);
+  pinMode(relayOpen, OUTPUT);
+  pinMode(relayClose, OUTPUT);
+  
   //power on output states 
-    digitalWrite(relayLight,HIGH);  //4 HIGH relay off
-    digitalWrite(relayChew,HIGH);  //5 HIGH relay off
-    digitalWrite(relayOpen,LOW);  //6 HIGH relay off
-    digitalWrite(relayClose,HIGH);  //7 HIGH relay off
+  digitalWrite(relayLight, HIGH);   //relay off
+  digitalWrite(relayChew, HIGH);    //relay off
+  digitalWrite(relayOpen, LOW);     //relay off
+  digitalWrite(relayClose, HIGH);   //relay off
 }
 
-void loop(){
-         chairController();
+void loop() {
+  chairController();
 }
-  
-void chairController(){ 
-    trigger_value = digitalRead(trigger);
 
-  switch(chairState){
-  
-  case 0://RESET
-    chairState = 1;//IDLE
-     
-  break;
+void chairController() {
+  trigger_value = digitalRead(trigger);
 
-  case 1://IDLE
-    if(trigger_value == HIGH){
-    chairState = 2;//TRIGGER_CLOSED
-    }
-    
-  break;
+  switch (chairState) {
+    case 0: //RESET
+      digitalWrite(relayLight, HIGH);   //relay off
+      digitalWrite(relayChew, HIGH);    //relay off
+      digitalWrite(relayOpen, HIGH);     //relay off
+      digitalWrite(relayClose, HIGH);   //relay off
+      chairState = 1; //IDLE
+      Serial.println("State: RESET");
+      break;
 
-  case 2://TRIGGER_CLOSED
-    timer_start = millis();
-    chairState = 3;//WAIT 
-  break;
+    case 1: //IDLE
+      if (trigger_value == HIGH) {
+        chairState = 2; //TRIGGER_CLOSED
+        Serial.println("State: IDLE -> TRIGGER_CLOSED");
+      }
+      break;
 
-  case 3://WAIT
-    timer_counting = millis();
-    if(timer_counting - timer_start > door_open_delay){
-    chairState = 4;//DOOR_OPEN
-    } 
-    if(trigger_value == LOW){
-    chairState = 0;//RESET
-    }
-    if(remote == HIGH){
-    chairState = 4;//DOOR_OPEN
-    }
-  break;
+    case 2: //TRIGGER_CLOSED
+      timer_start = millis();
+      chairState = 3; //WAIT
+      Serial.println("State: TRIGGER_CLOSED -> WAIT");
+      break;
 
-  case 4://DOOR_OPEN
-    digitalWrite(relayChew, LOW);
-    digitalWrite(relayOpen, LOW);  //blocking code for open animation start
-    delay(500);  
-    digitalWrite(relayOpen, HIGH);
-    delay(1500);
-    digitalWrite(relayOpen, LOW);
-    delay(2000);
-    digitalWrite(relayOpen, HIGH);  //blocking code for open animation end
-    chairState = 5;//RUNNING
-  break;
+    case 3: //WAIT
+      timer_counting = millis();
+      if (timer_counting - timer_start > door_open_delay) {
+        chairState = 4; //DOOR_OPEN
+        Serial.println("State: WAIT -> DOOR_OPEN");
+      }
+      else if (trigger_value == LOW) {
+        chairState = 0; //RESET
+        Serial.println("State: WAIT -> RESET");
+      }
+      if (digitalRead(remote) == HIGH) {
+        chairState = 4; //DOOR_OPEN
+        Serial.println("State: WAIT -> DOOR_OPEN (REMOTE)");
+      }
+      break;
 
-  case 5://RUNNING 
-    if(trigger == HIGH){
-    chairState = 6;//DOOR_CLOSE
-    }
-  break;
+    case 4: //DOOR_OPEN
+      digitalWrite(relayLight, LOW);
+      digitalWrite(relayChew, LOW);
+      digitalWrite(relayOpen, LOW); //blocking code for open animation start
+      delay(500);
+      digitalWrite(relayOpen, HIGH);
+      delay(1500);
+      digitalWrite(relayOpen, LOW);
+      delay(2000);
+      digitalWrite(relayOpen, HIGH); //blocking code for open animation end
+      chairState = 5; //RUNNING
+      Serial.println("State: DOOR_OPEN -> RUNNING");
+      break;
 
-  case 6://DOOR_CLOSE
-    digitalWrite(relayLight, LOW);
-    digitalWrite(relayChew, LOW);
-    digitalWrite(relayClose, HIGH);  //blocking code for close animation start
-    delay(500);  
-    digitalWrite(relayClose, LOW);
-    delay(1500);
-    digitalWrite(relayClose, HIGH);
-    delay(2000);
-    digitalWrite(relayClose, LOW);  //blocking code for close animation end
-    chairState = 0;//RESET
-  break;
-   
+    case 5: //RUNNING
+      if (trigger_value == LOW) {
+        chairState = 6; //DOOR_CLOSE
+        Serial.println("State: RUNNING -> DOOR_CLOSE");
+      }
+      break;
 
-
+    case 6: //DOOR_CLOSE
+      digitalWrite(relayLight, HIGH);
+      digitalWrite(relayChew, HIGH);
+      digitalWrite(relayClose, LOW); //ON blocking code for close animation start
+      delay(500);  //ON
+      digitalWrite(relayClose, HIGH);  //OFF
+      delay(1500);  //OFF
+      digitalWrite(relayClose, LOW); //ON
+      delay(2000);  //ON
+      digitalWrite(relayClose, LOW); //OFF blocking code for close animation end
+      chairState = 0; //RESET
+      Serial.println("State: DOOR_CLOSE -> RESET");
+      break;
   }
 }
