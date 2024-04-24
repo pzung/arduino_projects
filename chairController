@@ -1,0 +1,108 @@
+    #include <Arduino.h>
+  //input signals
+    #define trigger 2  //which arduino pin connection to trigger on stage wall
+    #define remote 3  //which arduinon pin connection to hand held remote control
+  //outputs to activate relalys
+    #define relayLight 4  //arduino pin connection to relay 1
+    #define relayChew 5  //arduino pin connection to relay 2
+    #define relayOpen 6  //arduino pin connection to relay 3
+    #define relayClose 7  //arduino pin connection to relay 4
+  //variables
+    int chairState = 4;
+    int trigger_value = 0;  //calling switch open or closed
+    unsigned long timer_start = 0;  //start counting
+    unsigned long timer_counting = 0;  //counting
+    unsigned long door_open_delay = 2000;  //wait threshold in milliseconds
+
+
+void setup() {
+  // put your setup code here, to run once:
+  //input
+    pinMode(trigger,INPUT);  //trigger stage wall
+    pinMode(remote,INPUT);  //remote control button
+  //outputs
+    pinMode(relayLight,OUTPUT);
+    pinMode(relayChew,OUTPUT);
+    pinMode(relayOpen,OUTPUT);
+    pinMode(relayClose,OUTPUT);
+  //power on output states 
+    digitalWrite(relayLight,HIGH);  //4 HIGH relay off
+    digitalWrite(relayChew,HIGH);  //5 HIGH relay off
+    digitalWrite(relayOpen,LOW);  //6 HIGH relay off
+    digitalWrite(relayClose,HIGH);  //7 HIGH relay off
+}
+
+void loop(){
+         chairController();
+}
+  
+void chairController(){ 
+    trigger_value = digitalRead(trigger);
+
+  switch(chairState){
+  
+  case 0://RESET
+    chairState = 1;//IDLE
+     
+  break;
+
+  case 1://IDLE
+    if(trigger_value == HIGH){
+    chairState = 2;//TRIGGER_CLOSED
+    }
+    
+  break;
+
+  case 2://TRIGGER_CLOSED
+    timer_start = millis();
+    chairState = 3;//WAIT 
+  break;
+
+  case 3://WAIT
+    timer_counting = millis();
+    if(timer_counting - timer_start > door_open_delay){
+    chairState = 4;//DOOR_OPEN
+    } 
+    if(trigger_value == LOW){
+    chairState = 0;//RESET
+    }
+    if(remote == HIGH){
+    chairState = 4;//DOOR_OPEN
+    }
+  break;
+
+  case 4://DOOR_OPEN
+    digitalWrite(relayChew, LOW);
+    digitalWrite(relayOpen, LOW);  //blocking code for open animation start
+    delay(500);  
+    digitalWrite(relayOpen, HIGH);
+    delay(1500);
+    digitalWrite(relayOpen, LOW);
+    delay(2000);
+    digitalWrite(relayOpen, HIGH);  //blocking code for open animation end
+    chairState = 5;//RUNNING
+  break;
+
+  case 5://RUNNING 
+    if(trigger == HIGH){
+    chairState = 6;//DOOR_CLOSE
+    }
+  break;
+
+  case 6://DOOR_CLOSE
+    digitalWrite(relayLight, LOW);
+    digitalWrite(relayChew, LOW);
+    digitalWrite(relayClose, HIGH);  //blocking code for close animation start
+    delay(500);  
+    digitalWrite(relayClose, LOW);
+    delay(1500);
+    digitalWrite(relayClose, HIGH);
+    delay(2000);
+    digitalWrite(relayClose, LOW);  //blocking code for close animation end
+    chairState = 0;//RESET
+  break;
+   
+
+
+  }
+}
